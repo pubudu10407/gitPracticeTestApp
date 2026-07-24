@@ -43,19 +43,27 @@ pipeline {
                 passwordVariable: 'DOCKERHUB_TOKEN'
             )
         ]) {
-            powershell '''
-                Write-Host "Logging in to Docker Hub..."
+            bat '''
+                @echo off
 
-                $env:DOCKERHUB_TOKEN |
-                    & $env:DOCKER_EXE login `
-                        --username $env:DOCKERHUB_USERNAME `
-                        --password-stdin
+                echo Logging in to Docker Hub...
 
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Docker Hub login failed with exit code $LASTEXITCODE"
-                }
+                echo %DOCKERHUB_TOKEN% > docker-token.txt
 
-                Write-Host "Docker Hub login successful."
+                type docker-token.txt | "%DOCKER_EXE%" login ^
+                    --username "%DOCKERHUB_USERNAME%" ^
+                    --password-stdin
+
+                set LOGIN_RESULT=%ERRORLEVEL%
+
+                del docker-token.txt
+
+                if not "%LOGIN_RESULT%"=="0" (
+                    echo Docker Hub login failed.
+                    exit /b %LOGIN_RESULT%
+                )
+
+                echo Docker Hub login successful.
             '''
         }
     }
