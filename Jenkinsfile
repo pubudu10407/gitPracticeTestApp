@@ -35,25 +35,31 @@ pipeline {
         }
 
         stage('Docker Hub Login') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKERHUB_USERNAME',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
-                    )
-                ]) {
-                    bat '''
-                        @echo off
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'dockerhub-credentials',
+                usernameVariable: 'DOCKERHUB_USERNAME',
+                passwordVariable: 'DOCKERHUB_TOKEN'
+            )
+        ]) {
+            powershell '''
+                Write-Host "Logging in to Docker Hub..."
 
-                        echo Logging in to Docker Hub...
-                        echo %DOCKERHUB_TOKEN% | "%DOCKER_EXE%" login ^
-                          --username %DOCKERHUB_USERNAME% ^
-                          --password-stdin
-                    '''
+                $env:DOCKERHUB_TOKEN |
+                    & $env:DOCKER_EXE login `
+                        --username $env:DOCKERHUB_USERNAME `
+                        --password-stdin
+
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Docker Hub login failed with exit code $LASTEXITCODE"
                 }
-            }
+
+                Write-Host "Docker Hub login successful."
+            '''
         }
+    }
+}
 
         stage('Push Docker Image') {
             steps {
