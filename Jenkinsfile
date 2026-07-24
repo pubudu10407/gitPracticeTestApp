@@ -3,17 +3,11 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'pubudu10407/student-registry'
-	DOCKER_EXE = 'C:\Users\GTC\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe'
+
+        DOCKER_EXE = 'C:\Users\GTC\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                echo 'Downloading source code from GitHub...'
-                checkout scm
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 bat '''
@@ -21,7 +15,7 @@ pipeline {
 
                     echo Building Docker image...
 
-                    docker build ^
+                    "%DOCKER_EXE%" build ^
                       -t %DOCKER_IMAGE%:%BUILD_NUMBER% ^
                       -t %DOCKER_IMAGE%:latest ^
                       .
@@ -34,8 +28,8 @@ pipeline {
                 bat '''
                     @echo off
 
-                    echo Checking the created image...
-                    docker image inspect %DOCKER_IMAGE%:%BUILD_NUMBER%
+                    echo Verifying Docker image...
+                    "%DOCKER_EXE%" image inspect %DOCKER_IMAGE%:%BUILD_NUMBER%
                 '''
             }
         }
@@ -53,7 +47,7 @@ pipeline {
                         @echo off
 
                         echo Logging in to Docker Hub...
-                        echo %DOCKERHUB_TOKEN% | docker login ^
+                        echo %DOCKERHUB_TOKEN% | "%DOCKER_EXE%" login ^
                           --username %DOCKERHUB_USERNAME% ^
                           --password-stdin
                     '''
@@ -66,11 +60,11 @@ pipeline {
                 bat '''
                     @echo off
 
-                    echo Pushing version %BUILD_NUMBER%...
-                    docker push %DOCKER_IMAGE%:%BUILD_NUMBER%
+                    echo Pushing numbered image...
+                    "%DOCKER_EXE%" push %DOCKER_IMAGE%:%BUILD_NUMBER%
 
-                    echo Pushing latest version...
-                    docker push %DOCKER_IMAGE%:latest
+                    echo Pushing latest image...
+                    "%DOCKER_EXE%" push %DOCKER_IMAGE%:latest
                 '''
             }
         }
@@ -82,14 +76,19 @@ pipeline {
         }
 
         failure {
-            echo 'FAILED: Open Console Output and check the failed stage.'
+            echo 'FAILED: Check the failed pipeline stage.'
         }
 
         always {
-            bat '''
-                @echo off
-                docker logout
-            '''
+            script {
+                bat(
+                    returnStatus: true,
+                    script: '''
+                        @echo off
+                        "%DOCKER_EXE%" logout
+                    '''
+                )
+            }
         }
     }
 }
