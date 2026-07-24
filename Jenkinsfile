@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'pubudu10407/student-registry'
+	DOCKER_EXE = 'C:\Users\GTC\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe'
     }
 
     stages {
