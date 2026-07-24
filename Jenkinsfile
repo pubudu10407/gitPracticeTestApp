@@ -102,44 +102,56 @@ pipeline {
             }
         }
 
-        stage('Docker Hub Login') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKERHUB_USERNAME',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
-                    )
-                ]) {
-                    powershell '''
-                        Write-Host "========================================"
-                        Write-Host "DOCKER HUB LOGIN"
-                        Write-Host "========================================"
+       stage('Docker Hub Login') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'dockerhub-credentials',
+                usernameVariable: 'DOCKERHUB_USERNAME',
+                passwordVariable: 'DOCKERHUB_TOKEN'
+            )
+        ]) {
+            powershell '''
+                $ErrorActionPreference = "Stop"
 
-                        if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_USERNAME)) {
-                            throw "Docker Hub username was not loaded from Jenkins credentials."
-                        }
+                Write-Host "Logging in to Docker Hub as $env:DOCKERHUB_USERNAME..."
 
-                        if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_TOKEN)) {
-                            throw "Docker Hub token was not loaded from Jenkins credentials."
-                        }
-
-                        Write-Host "Logging in as $env:DOCKERHUB_USERNAME..."
-
-                        $env:DOCKERHUB_TOKEN |
-                            & "$env:DOCKER_EXE" login `
-                                --username "$env:DOCKERHUB_USERNAME" `
-                                --password-stdin
-
-                        if ($LASTEXITCODE -ne 0) {
-                            throw "Docker Hub login failed with exit code $LASTEXITCODE."
-                        }
-
-                        Write-Host "Docker Hub login succeeded."
-                    '''
+                if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_USERNAME)) {
+                    throw "Docker Hub username is empty."
                 }
-            }
+
+                if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_TOKEN)) {
+                    throw "Docker Hub token is empty."
+                }
+
+                # Remove accidental spaces or line breaks.
+                $token = $env:DOCKERHUB_TOKEN.Trim()
+
+                # Write token without BOM and without a newline.
+                $tokenFile = Join-Path $env:TEMP "jenkins-docker-token.txt"
+                $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+                [System.IO.File]::WriteAllText(
+                    $tokenFile,
+                    $token,
+                    $utf8WithoutBom
+                )
+
+                try {
+                    cmd.exe /d /c "type `"$tokenFile`" | `"$env:DOCKER_EXE`" login --username `"$env:DOCKERHUB_USERNAME`" --password-stdin"
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Docker Hub login failed with exit code $LASTEXITCODE."
+                    }
+
+                    Write-Host "Docker Hub login successful."
+                }
+                finally {
+                    Remove-Item $tokenFile -Force -ErrorAction SilentlyContinue
+                }
+            '''
         }
+    }
+}
 
         stage('Push Docker Image') {
             steps {
