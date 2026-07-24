@@ -43,27 +43,31 @@ pipeline {
                 passwordVariable: 'DOCKERHUB_TOKEN'
             )
         ]) {
-            bat '''
-                @echo off
+            powershell '''
+                Write-Host "Docker Hub username: $env:DOCKERHUB_USERNAME"
 
-                echo Logging in to Docker Hub...
+                if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_USERNAME)) {
+                    throw "Docker Hub username was not loaded from Jenkins credentials."
+                }
 
-                echo %DOCKERHUB_TOKEN% > docker-token.txt
+                if ([string]::IsNullOrWhiteSpace($env:DOCKERHUB_TOKEN)) {
+                    throw "Docker Hub token was not loaded from Jenkins credentials."
+                }
 
-                type docker-token.txt | "%DOCKER_EXE%" login ^
-                    --username "%DOCKERHUB_USERNAME%" ^
+                Write-Host "Username loaded successfully."
+                Write-Host "Token loaded successfully."
+                Write-Host "Attempting Docker Hub login..."
+
+                $env:DOCKERHUB_TOKEN |
+                    & "$env:DOCKER_EXE" login `
+                    --username "$env:DOCKERHUB_USERNAME" `
                     --password-stdin
 
-                set LOGIN_RESULT=%ERRORLEVEL%
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Docker login returned exit code $LASTEXITCODE"
+                }
 
-                del docker-token.txt
-
-                if not "%LOGIN_RESULT%"=="0" (
-                    echo Docker Hub login failed.
-                    exit /b %LOGIN_RESULT%
-                )
-
-                echo Docker Hub login successful.
+                Write-Host "Docker Hub login succeeded."
             '''
         }
     }
